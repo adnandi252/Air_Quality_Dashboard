@@ -52,7 +52,7 @@ with col2:
 
 # Visualisasi 3: Polutan per Stasiun (2016)
 with col3:
-    st.subheader(f"Rata-rata {selected_polutant} per Stasiun (2016)")
+    st.subheader(f"Rata-rata SO2 per Stasiun (2016)")
     data_2016 = data[data['year'] == 2016]
     so2_station_2016 = data_2016.groupby('station')['SO2'].mean().reset_index()
     so2_station_2016 = so2_station_2016.sort_values(by='SO2', ascending=False)
