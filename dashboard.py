@@ -1,24 +1,25 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
+import plotly.express as px
+import plotly.graph_objects as go
 
 st.set_page_config(layout="wide")
 
-# Judul Dashboard
+# Judul
 st.title("Dashboard Analisis Kualitas Udara (2013-2017)")
 
 # Load data
 data = pd.read_csv('cleaned_air_quality_data.csv')
 data['year'] = pd.Categorical(data['year'], categories=[2013, 2014, 2015, 2016, 2017], ordered=True)
 
-polutant_options = ['PM2.5', 'PM10', 'SO2', 'CO', 'NO2', 'O3']
-station_options = ['All'] + list(data['station'].unique())
+# Sidebar filter
+st.sidebar.header("Filter Data")
+selected_years = st.sidebar.multiselect("Pilih Tahun", options=[2013, 2014, 2015, 2016, 2017], default=[2013, 2014, 2015, 2016, 2017])
 
-# Filter global untuk semua barchart
-selected_polutant = st.selectbox("Pilih Jenis Polutan", polutant_options)
-selected_station = st.selectbox("Pilih Stasiun", station_options)
+filtered_data = data[data['year'].isin(selected_years)]
+pollutants = ['CO', 'SO2', 'NO2', 'PM2.5', 'PM10', 'O3']
+selected_pollutant = st.sidebar.selectbox("Pilih Jenis Polusi", pollutants, index=0)
 
 # Membuat layout grid 2x2
 col1, col2 = st.columns(2)
@@ -26,75 +27,69 @@ col3, col4 = st.columns(2)
 
 # Visualisasi 1: Tren Bulanan Polutan
 with col1:
-    if selected_station == "All":
-        st.subheader(f"Tren Rata-rata {selected_polutant} per Bulan di Semua Stasiun")
-    else:
-        st.subheader(f"Tren Rata-rata {selected_polutant} per Bulan di Stasiun {selected_station}")
-    filtered_data = data if selected_station == "All" else data[data['station'] == selected_station]
-    monthly_trend = filtered_data.groupby(['year', 'month'])[selected_polutant].mean().reset_index()
-    fig1, ax1 = plt.subplots(figsize=(10, 6))
-    sns.barplot(data=monthly_trend, x='month', y=selected_polutant, hue='year', palette='tab10', 
-                hue_order=[2013, 2014, 2015, 2016, 2017], ax=ax1)
-    ax1.set_title(f'Tren Rata-rata {selected_polutant} (2013-2017)', fontsize=14)
-    ax1.set_xlabel('Bulan', fontsize=12)
-    ax1.set_ylabel(f'Mean {selected_polutant}', fontsize=12)
-    ax1.set_xticklabels(np.arange(1, 13), fontsize=10)
-    ax1.legend(title='Tahun', title_fontsize=12, fontsize=10)
-    plt.tight_layout()
-    st.pyplot(fig1)
+    st.subheader(f"Tren Rata-rata {selected_pollutant} per Bulan")
+    monthly_trend = filtered_data.groupby(['year', 'month'])[selected_pollutant].mean().reset_index()
+    fig1 = px.bar(monthly_trend, 
+              x='month', y=selected_pollutant, color='year', barmode='group',
+              color_discrete_sequence=px.colors.qualitative.Set1,
+              labels={selected_pollutant: f'Rata-rata {selected_pollutant}', 'month': 'Bulan'},
+              title=f'Tren Rata-rata {selected_pollutant} (2013-2017)')
+    fig1.update_layout(xaxis=dict(tickmode='array', tickvals=list(range(1,13))))
+    st.plotly_chart(fig1, use_container_width=True)
 
 # Visualisasi 2: Tren Tahunan Polutan
 with col2:
-    if selected_station == "All":
-        st.subheader(f"Rata-rata {selected_polutant} per Tahun di Semua Stasiun")
-    else:
-        st.subheader(f"Rata-rata {selected_polutant} per Tahun di Stasiun {selected_station}")
-    yearly_trend = filtered_data.groupby('year')[selected_polutant].mean().reset_index()
-    fig2, ax2 = plt.subplots(figsize=(10, 6))
-    ax2 = sns.barplot(data=yearly_trend, x='year', y=selected_polutant, palette='tab10')
-    for i, row in yearly_trend.iterrows():
-        ax2.text(i, row[selected_polutant] + 0.2, f'{row[selected_polutant]:.2f}', ha='center', fontsize=10)
-    ax2.set_title(f'Rata-rata {selected_polutant} per Tahun', fontsize=14)
-    ax2.set_xlabel('Tahun', fontsize=12)
-    ax2.set_ylabel(f'Mean {selected_polutant}', fontsize=12)
-    ax2.tick_params(axis='x', labelsize=10)
-    plt.tight_layout()
-    st.pyplot(fig2)
+    st.subheader(f"Rata-rata {selected_pollutant} per Tahun")
+    yearly_trend = filtered_data.groupby('year')[selected_pollutant].mean().reset_index()
+    fig2 = px.bar(yearly_trend, x='year', y=selected_pollutant,
+              color='year', text=selected_pollutant,
+              color_discrete_sequence=px.colors.qualitative.Set1,
+              labels={selected_pollutant: f'Rata-rata {selected_pollutant}', 'year': 'Tahun'},
+              title=f'Rata-rata {selected_pollutant} per Tahun')
+    fig2.update_traces(texttemplate='%{text:.2f}', textposition='outside')
+    fig2.update_layout(uniformtext_minsize=8, uniformtext_mode='hide')
+    st.plotly_chart(fig2, use_container_width=True)
 
 # Visualisasi 3: Polutan per Stasiun (2016)
 with col3:
     st.subheader(f"Rata-rata {selected_polutant} per Stasiun (2016)")
     data_2016 = data[data['year'] == 2016]
-    station_trend_2016 = data_2016.groupby('station')[selected_polutant].mean().reset_index()
-    station_trend_2016 = station_trend_2016.sort_values(by=selected_polutant, ascending=False)
-    fig3, ax3 = plt.subplots(figsize=(10, 6))
-    ax3 = sns.barplot(data=station_trend_2016, x='station', y=selected_polutant, palette='viridis')
-    for i, row in enumerate(station_trend_2016.itertuples()):
-        ax3.text(i, row[2] + 0.2, f'{row[2]:.2f}', ha='center', fontsize=10)
-    ax3.set_title(f'Rata-rata {selected_polutant} (2016)', fontsize=14)
-    ax3.set_xlabel('Stasiun', fontsize=12)
-    ax3.set_ylabel(f'Mean {selected_polutant}', fontsize=12)
-    ax3.tick_params(axis='x', rotation=45, labelsize=10)
-    plt.tight_layout()
-    st.pyplot(fig3)
+    so2_station_2016 = data_2016.groupby('station')['SO2'].mean().reset_index()
+    so2_station_2016 = so2_station_2016.sort_values(by='SO2', ascending=False)
+    fig3 = px.bar(so2_station_2016, 
+                  x='station', y='SO2', text='SO2',
+                  color='SO2', color_continuous_scale='Viridis',
+                  labels={'SO2': 'Rata-rata SO2', 'station': 'Stasiun'},
+                  title='Rata-rata SO2 per Stasiun (2016)')
+    fig3.update_traces(texttemplate='%{text:.2f}', textposition='outside')
+    fig3.update_layout(xaxis_tickangle=-45)
+    st.plotly_chart(fig3, use_container_width=True)
 
 # Visualisasi 4: Heatmap Korelasi
 with col4:
     st.subheader("Korelasi Polusi & Meteorologi")
     selected_columns = ['PM2.5', 'PM10', 'SO2', 'NO2', 'CO', 'O3', 'TEMP', 'PRES', 'DEWP', 'RAIN', 'WSPM']
-    corr_matrix = data[selected_columns].corr()
-    mask = np.triu(np.ones_like(corr_matrix, dtype=bool))
-    fig4, ax4 = plt.subplots(figsize=(10, 6))
-    sns.heatmap(corr_matrix, mask=mask, annot=True, cmap='coolwarm', fmt=".2f", 
-                linewidths=0.5, ax=ax4, annot_kws={"size": 10})
-    ax4.set_title('Heatmap Korelasi', fontsize=14)
-    plt.tight_layout()
-    st.pyplot(fig4)
+    corr_matrix = filtered_data[selected_columns].corr().round(2)
 
-# Menambahkan deskripsi
+    fig4 = go.Figure(data=go.Heatmap(
+        z=corr_matrix.values,
+        x=corr_matrix.columns,
+        y=corr_matrix.index,
+        colorscale='RdBu',
+        reversescale=True,
+        zmin=-1, zmax=1,
+        text=corr_matrix.values,
+        texttemplate="%{text}",
+        hoverongaps=False))
+    fig4.update_layout(title='Heatmap Korelasi', xaxis_title="", yaxis_title="", width=800, height=500)
+    st.plotly_chart(fig4, use_container_width=True)
+
+# Deskripsi
 st.markdown("""
-Dashboard ini menampilkan analisis kualitas udara dari tahun 2013-2017.
-Visualisasi yang disajikan meliputi tren rata-rata polutan per bulan (berdasarkan stasiun dan jenis polutan), 
-rata-rata polutan per tahun (berdasarkan stasiun dan jenis polutan),
-rata-rata polutan per stasiun pada tahun 2016, dan heatmap korelasi antara polusi dan meteorologi.
+Dashboard ini menampilkan analisis kualitas udara dari tahun 2013-2017.  
+Visualisasi yang disajikan meliputi:
+- **Tren rata-rata CO per bulan**
+- **Rata-rata CO per tahun**
+- **Rata-rata SO2 per stasiun pada tahun 2016**
+- **Heatmap korelasi antara polutan dan variabel meteorologi**
 """)
